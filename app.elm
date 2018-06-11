@@ -1,5 +1,3 @@
--- Read more about this program in the official Elm guide:
--- https://guide.elm-lang.org/architecture/effects/http.html
 
 import Html exposing (..)
 import Html.Attributes exposing (..)
@@ -8,72 +6,67 @@ import Http
 import Json.Decode as Decode
 
 
-
 main =
   Html.program
-    { init = init "cats"
+    { init = init
     , view = view
     , update = update
     , subscriptions = subscriptions
     }
 
 
-
 -- MODEL
 
-
 type alias Model =
-  { topic : String
-  , gifUrl : String
-  }
+  {counter : Int}
 
-
-init : String -> (Model, Cmd Msg)
-init topic =
-  ( Model topic "waiting.gif"
-  , getRandomGif topic
-  )
-
-
+init : (Model, Cmd Msg)
+init =
+  (Model 0, Cmd.none)
 
 -- UPDATE
 
-
-type Msg
-  = MorePlease
-  | NewGif (Result Http.Error String)
+type Msg 
+  = Get
+  | GetCounter (Result Http.Error Int)
+  | Reset
+  | ResetCounter (Result Http.Error Int)
 
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
   case msg of
-    MorePlease ->
-      (model, getRandomGif model.topic)
+    Get ->
+      (model, getServerCounter)
 
-    NewGif (Ok newUrl) ->
-      (Model model.topic newUrl, Cmd.none)
+    GetCounter (Ok newCounter) ->
+      ( { model | counter = newCounter }, Cmd.none )
 
-    NewGif (Err _) ->
+    GetCounter (Err _) ->
+      (model, Cmd.none)
+
+    Reset ->
+    (model, resetServerCounter)
+
+    ResetCounter (Ok newCounter) ->
+      ( { model | counter = newCounter }, Cmd.none )
+
+    ResetCounter (Err _) ->
       (model, Cmd.none)
 
 
 
 -- VIEW
 
-
 view : Model -> Html Msg
 view model =
   div []
-    [ h2 [] [text model.topic]
-    , button [ onClick MorePlease ] [ text "More Please!" ]
-    , br [] []
-    , img [src model.gifUrl] []
+    [ h2 [] [text (toString model.counter)]
+    , button [onClick Get] [text "Get"]
+    , button [onClick Reset] [text "Reset"]
     ]
 
-
-
 -- SUBSCRIPTIONS
-
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
@@ -83,16 +76,28 @@ subscriptions model =
 
 -- HTTP
 
-
-getRandomGif : String -> Cmd Msg
-getRandomGif topic =
+getServerCounter : Cmd Msg
+getServerCounter =
   let
-    url =
-      "https://api.giphy.com/v1/gifs/random?api_key=dc6zaTOxFJmzC&tag=" ++ topic
+    url = "http://localhost:3000/counter"
+
+    request =
+      Http.get url decodeCounter
   in
-    Http.send NewGif (Http.get url decodeGifUrl)
+    Http.send GetCounter request
 
 
-decodeGifUrl : Decode.Decoder String
-decodeGifUrl =
-  Decode.at ["data", "image_url"] Decode.string
+resetServerCounter : Cmd Msg
+resetServerCounter =
+  let 
+    url = "http://localhost:3000/counter/1"
+
+    request = Http.post url Http.emptyBody decodeCounter
+
+  in
+    Http.send ResetCounter request
+
+
+decodeCounter : Decode.Decoder Int
+decodeCounter =
+  Decode.at ["counter"] Decode.int
